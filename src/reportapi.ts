@@ -5,27 +5,37 @@
 import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { tool, ModelMessage, generateText, stepCountIs } from "ai";
 import { z } from 'zod';
-import { executeKaliCommand } from './kali';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const deepinfra = createDeepInfra({
   apiKey: process.env.DEEPINFRA_API_KEY,
 });
-const kaliTool = tool({
-    description: 'Run a bash shell command on Kali Linux VM. Returns stdout and stderr output.',
-    inputSchema: z.object({
-      commandStr: z.string().describe('Bash shell command to be run'),
-    }),
-    execute: async ({ commandStr }) => {
-      // Pass undefined panel to allow kali.ts to resolve active panel if available
-      return await executeKaliCommand(commandStr, undefined, false);
-    },
-});
+// Lazily create a Kali tool. This avoids importing VS Code APIs when running in Node-only contexts (e.g., unit tests).
+function getKaliTool() {
+  try {
+    // Dynamically require to avoid pulling 'vscode' at module load time.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { executeKaliCommand } = require('./kali');
+    return tool({
+      description: 'Run a bash shell command on Kali Linux VM. Returns stdout and stderr output.',
+      inputSchema: z.object({
+        commandStr: z.string().describe('Bash shell command to be run'),
+      }),
+      execute: async ({ commandStr }) => {
+        // Pass undefined panel to allow kali.ts to resolve active panel if available
+        return await executeKaliCommand(commandStr, undefined, false);
+      },
+    });
+  } catch (_err) {
+    // Kali or VS Code environment not available; return undefined so tools are omitted.
+    return undefined;
+  }
+}
 // Load constraints for a known benchmark from assets CSV files
 async function benchmarkToConstraints(benchmark: string): Promise<Array<{name: string; section: string; granular: string; kaliTest: string;}>> {
   if (benchmark !== 'OWASP') return [];
-  const csvPath = path.resolve(__dirname, '..', '..', 'assets', 'OWASP.csv');
+  const csvPath = path.resolve(__dirname,  '..', 'assets', 'OWASP.csv');
   const csvText = await fs.promises.readFile(csvPath, 'utf-8');
   const rows = parseCsv(csvText);
   // Map CSV headers to our normalized object keys
@@ -89,23 +99,26 @@ function parseCsvLine(line: string): string[] {
 export async function generateReport(
   benchmark: string,
   targets: string[],
-  options?: {
-    llmCall?: (messages: ModelMessage[]) => Promise<string>;
-    constraints?: Array<{ name: string; section: string; granular: string; kaliTest: string }>;
-  }
 ) {
-  const constraints = options?.constraints ?? (await benchmarkToConstraints(benchmark));
+  console.log('generateReport called!')
+  const constraints = (await benchmarkToConstraints(benchmark));
   const results: Array<{ constraint: string; status: string; evidence: string | null; commands: string[] | null }> = [];
+  const outputs: Array<{ constraint: string; status: 'PASS' | 'FAIL' | 'NOT TESTABLE'; evidence: string; commands: string[] }> = [];
+  console.log(constraints);
 
   // Default LLM call implementation using DeepInfra and AI SDK
   const defaultLlmCall = async (messages: ModelMessage[]) => {
-    const gen = await generateText({
+    const kali = getKaliTool();
+    const callOptions: any = {
       model: deepinfra("deepseek-ai/DeepSeek-R1"),
       messages,
-      tools: { executeKaliCommand: kaliTool },
       // Allow a bit more tool-stepping than the UI chat
       stopWhen: stepCountIs(12),
-    });
+    };
+    if (kali) {
+      callOptions.tools = { executeKaliCommand: kali };
+    }
+    const gen = await generateText(callOptions);
     return gen.text;
   };
 
@@ -148,24 +161,20 @@ export async function generateReport(
     ];
 
     const responseText = await llmCall(taskMessages);
+    console.log('response text:');
+    console.log(responseText);
     // Try to parse JSON if the model followed instructions; if not, coerce a minimal structure
     try {
       const parsed = JSON.parse(responseText);
-      results.push({
-        constraint: parsed.constraint ?? name,
-        status: parsed.status ?? 'NOT TESTABLE',
-        evidence: parsed.evidence ?? null,
-        commands: parsed.commands ?? null,
-      });
+      const constraintName = parsed.constraint ?? name;
+      const status = (parsed.status ?? 'NOT TESTABLE') as 'PASS' | 'FAIL' | 'NOT TESTABLE';
+      const evidence = typeof parsed.evidence === 'string' ? parsed.evidence : JSON.stringify(parsed.evidence ?? '');
+      const commands = Array.isArray(parsed.commands) ? parsed.commands : [];
+      results.push({ constraint: constraintName, section: section, description: granular, strategy: kaliTest, status:  status, evidence: evidence, commands: commands });
     } catch {
-      results.push({
-        constraint: name,
-        status: 'NOT TESTABLE',
-        evidence: responseText,
-        commands: null,
-      });
+      results.push({ constraint: name, section: section, description: granular, strategy: kaliTest, status: 'NOT TESTABLE', evidence: responseText, commands: null });
     }
   }
 
-  return { benchmark, targets, results };
+  return { results};
 }

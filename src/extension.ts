@@ -195,7 +195,10 @@ function getWebviewContent() {
   <html lang="en">
   <head>
     <meta charset="UTF-8" />
+<<<<<<< HEAD
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+=======
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
     <style>
       body {
         font-family: system-ui, sans-serif;
@@ -216,6 +219,7 @@ function getWebviewContent() {
         gap: 12px;
       }
       .message {
+<<<<<<< HEAD
         max-width: 75%;
         padding: 12px 16px;
         border-radius: 16px;
@@ -227,17 +231,31 @@ function getWebviewContent() {
       @keyframes fadeIn {
         from { opacity: 0; transform: translateY(6px); }
         to { opacity: 1; transform: translateY(0); }
+=======
+        max-width: 80%;
+        padding: 12px 16px;
+        border-radius: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
       .user {
         align-self: flex-end;
         background-color: #007acc;
+<<<<<<< HEAD
         color: #fff;
         border-bottom-right-radius: 4px;
+=======
+        color: white;
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
       .assistant {
         align-self: flex-start;
         background-color: #2d2d30;
+<<<<<<< HEAD
         border-bottom-left-radius: 4px;
+=======
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
       .command-block {
         background-color: #111;
@@ -246,34 +264,55 @@ function getWebviewContent() {
         margin-top: 6px;
         border-radius: 6px;
         font-family: monospace;
+<<<<<<< HEAD
         white-space: pre-wrap;
+=======
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
       .output-block {
         background-color: #2c2c2c;
         padding: 8px;
+<<<<<<< HEAD
         margin-top: 6px;
         border-radius: 6px;
         font-family: monospace;
         color: #b5e853;
         white-space: pre-wrap;
+=======
+        margin-top: 4px;
+        border-radius: 6px;
+        font-family: monospace;
+        color: #b5e853;
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
       .confirm-buttons {
         margin-top: 6px;
         display: flex;
         gap: 8px;
       }
+<<<<<<< HEAD
       .confirm-buttons button {
         padding: 6px 10px;
+=======
+      button {
+        padding: 6px 12px;
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
         border: none;
         border-radius: 6px;
         cursor: pointer;
       }
       #input-container {
         display: flex;
+<<<<<<< HEAD
         padding: 10px;
         background-color: #252526;
         border-top: 1px solid #333;
         gap: 8px;
+=======
+        padding: 12px;
+        background-color: #252526;
+        border-top: 1px solid #333;
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
       #cmd {
         flex: 1;
@@ -282,22 +321,33 @@ function getWebviewContent() {
         border: none;
         outline: none;
         font-size: 14px;
+<<<<<<< HEAD
         background: #1e1e1e;
         color: #fff;
+=======
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
       #ask {
         background-color: #007acc;
         color: white;
+<<<<<<< HEAD
         border: none;
         border-radius: 6px;
         padding: 8px 12px;
         cursor: pointer;
+=======
+        margin-left: 8px;
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
     </style>
   </head>
   <body>
+<<<<<<< HEAD
     <div id="chat-container" role="log" aria-live="polite"></div>
 
+=======
+    <div id="chat-container"></div>
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
     <div id="input-container">
       <input id="cmd" type="text" placeholder="Ask the AI Pentester..." />
       <button id="ask">Send</button>
@@ -309,6 +359,7 @@ function getWebviewContent() {
       const input = document.getElementById('cmd');
       const askBtn = document.getElementById('ask');
 
+<<<<<<< HEAD
       function appendMessage(role, text) {
         const wrapper = document.createElement('div');
         wrapper.className = 'message ' + role;
@@ -316,12 +367,60 @@ function getWebviewContent() {
         chatContainer.appendChild(wrapper);
         chatContainer.scrollTop = chatContainer.scrollHeight;
         return wrapper;
+=======
+      let messageHistory = []; // store full conversation
+
+      function renderMessages() {
+        chatContainer.innerHTML = '';
+        for (const msg of messageHistory) {
+          const msgDiv = document.createElement('div');
+          msgDiv.className = 'message ' + (msg.role === 'user' ? 'user' : 'assistant');
+          msgDiv.innerHTML = msg.text;
+
+          // if AI generated a command
+          if (msg.command) {
+            const cmdBlock = document.createElement('pre');
+            cmdBlock.className = 'command-block';
+            cmdBlock.textContent = msg.command;
+            msgDiv.appendChild(cmdBlock);
+
+            // Confirm buttons
+            const btnDiv = document.createElement('div');
+            btnDiv.className = 'confirm-buttons';
+            const yes = document.createElement('button');
+            yes.textContent = 'Run Command';
+            yes.onclick = () => vscode.postMessage({ command: 'commandConfirmed', cmd: msg.command });
+            const no = document.createElement('button');
+            no.textContent = 'Cancel';
+            no.onclick = () => vscode.postMessage({ command: 'commandRejected', cmd: msg.command });
+            btnDiv.appendChild(yes);
+            btnDiv.appendChild(no);
+            msgDiv.appendChild(btnDiv);
+          }
+
+          // if command output exists
+          if (msg.output) {
+            const outDiv = document.createElement('pre');
+            outDiv.className = 'output-block';
+            outDiv.textContent = msg.output;
+            msgDiv.appendChild(outDiv);
+          }
+
+          chatContainer.appendChild(msgDiv);
+        }
+        chatContainer.scrollTop = chatContainer.scrollHeight; // auto-scroll
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
       }
 
       askBtn.addEventListener('click', () => {
         const text = input.value.trim();
         if (!text) return;
+<<<<<<< HEAD
         appendMessage('user', text);
+=======
+        messageHistory.push({ role: 'user', text });
+        renderMessages();
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
         vscode.postMessage({ command: 'chat', text });
         input.value = '';
       });
@@ -336,6 +435,7 @@ function getWebviewContent() {
       let currentAssistantBubble = null;
 
       window.addEventListener('message', event => {
+<<<<<<< HEAD
         const { command, text, cmd, output, reason } = event.data;
 
         if (command === 'chatResponse') {
@@ -388,6 +488,29 @@ function getWebviewContent() {
           outBlock.textContent = output;
           wrapper.appendChild(outBlock);
           currentAssistantBubble = null;
+=======
+        const { command, text, cmd, output } = event.data;
+
+        if (command === 'chatResponse') {
+          // streaming AI text
+          const last = messageHistory.findLast(m => m.role === 'assistant');
+          if (last) last.text = text;
+          else messageHistory.push({ role: 'assistant', text });
+          renderMessages();
+        }
+
+        if (command === 'confirmCommand') {
+          // AI wants to run a command
+          messageHistory.push({ role: 'assistant', text: 'The AI suggests running this command:', command: cmd });
+          renderMessages();
+        }
+
+        if (command === 'commandOutput') {
+          // show command result below the code block
+          const last = messageHistory.findLast(m => m.command === cmd);
+          if (last) last.output = output;
+          renderMessages();
+>>>>>>> af87929bc5bd80bb4624745d6a39b0439ee54ba7
         }
       });
     </script>
@@ -395,5 +518,6 @@ function getWebviewContent() {
   </html>
   `;
 }
+
 
 export function deactivate() {}
