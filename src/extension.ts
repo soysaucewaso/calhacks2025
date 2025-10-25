@@ -3,9 +3,10 @@ import * as vscode from 'vscode';
 import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { tool, ToolSet, ModelMessage, streamText, zodSchema, stepCountIs } from "ai";
 import { z } from 'zod';
+import deepinfra_key from './keys';
 const { executeKaliCommand } = require('./kali');
 const deepinfra = createDeepInfra({
-  apiKey: process.env.DEEPINFRA_API_KEY,
+  apiKey: deepinfra_key(),
 });
 let systemPrompt = `
 You are an AI pentesting assistant.
