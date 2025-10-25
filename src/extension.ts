@@ -20,14 +20,10 @@ let kaliTool = tool({
   inputSchema: z.object({
     commandStr: z.string().describe('Bash shell command to be run'),
   }),
-  execute: async ({commandStr}) => executeKaliCommand(commandStr),
+  execute: async ({commandStr}) => executeKaliCommand(commandStr, activePanel, false),
 })
 
 let activePanel: vscode.WebviewPanel;
-
-export function getActivePanel() {
-  return activePanel;
-}
 
 export function activate(context: vscode.ExtensionContext) {
   const disposable = vscode.commands.registerCommand('ai-pentester.activate', () => {
@@ -129,4 +125,6 @@ function getWebviewContent() {
 }
 
 export function deactivate() {}
+
+
 
