@@ -29,7 +29,8 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
-    "api": "npm run compile && node src/test/reportapi.test.js"
+    "api": "npm run compile && node src/test/reportapi.test.js",
+    "wss": "npm run compile && node out/wss.js"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -45,7 +46,8 @@
   "dependencies": {
     "@ai-sdk/deepinfra": "^1.0.23",
     "ai": "^5.0.76",
-    "node-ssh": "^13.2.1"
+    "node-ssh": "^13.2.1",
+    "ws": "^8.18.0"
   },
   "activationEvents": [
     "onCommand:ai-pentester.helloWorld",

@@ -102,8 +102,7 @@ export async function generateReport(
 ) {
   console.log('generateReport called!')
   const constraints = (await benchmarkToConstraints(benchmark));
-  const results: Array<{ constraint: string; status: string; evidence: string | null; commands: string[] | null }> = [];
-  const outputs: Array<{ constraint: string; status: 'PASS' | 'FAIL' | 'NOT TESTABLE'; evidence: string; commands: string[] }> = [];
+  const results: Array<{ constraint: string; section: string, description: string, strategy: string, status: string; evidence: string | null; commands: string[] | null }> = [];
   console.log(constraints);
 
   // Default LLM call implementation using DeepInfra and AI SDK
@@ -122,7 +121,7 @@ export async function generateReport(
     return gen.text;
   };
 
-  const llmCall = options?.llmCall ?? defaultLlmCall;
+  const llmCall = defaultLlmCall;
 
   for (const constraint of constraints) {
     const { name, section, granular, kaliTest } = constraint;
