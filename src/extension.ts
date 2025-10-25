@@ -4,9 +4,8 @@ import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { tool, ToolSet, ModelMessage, streamText, zodSchema, stepCountIs } from "ai";
 import { z } from 'zod';
 const { executeKaliCommand } = require('./kali');
-
 const deepinfra = createDeepInfra({
-  apiKey: "C6XdSQWnJ6BR6O8gCbyG4EjbP6LPLNiu",
+  apiKey: process.env.DEEPINFRA_API_KEY,
 });
 let systemPrompt = `
 You are an AI pentesting assistant.
