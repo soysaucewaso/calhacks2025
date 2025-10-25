@@ -31,7 +31,7 @@ async function executeKali(commandStr: string){
     await ssh.connect({
     // host: "192.168.128.2",   // Your Kali VM IP
     host: "8.tcp.ngrok.io",
-    port: 12390,
+    port: 11149,
     username: "aiproxy",
     password: "aiproxy", // or use privateKey: "~/.ssh/id_rsa"
     });
