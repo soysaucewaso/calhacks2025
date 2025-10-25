@@ -1,0 +1,14 @@
+{
+  "node": {
+    "e8ac1f7431366d9453f78c14884daba0ace3f089": {
+      "workers": {
+        "app/playbook/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fsaikhushaldulam%2Fcalhacks2025%2Ffrontend%2Fsrc%2Fapp%2Fplaybook%2Factions.ts%22%2C%5B%22getSuggestedTasks%22%5D%5D%5D&__client_imported__=true!"
+      },
+      "layer": {
+        "app/playbook/page": "action-browser"
+      }
+    }
+  },
+  "edge": {},
+  "encryptionKey": "Et9UjA6j6e5SDv3NsQBd4qFQpal6VH0tM0ooo3zxunU="
+}

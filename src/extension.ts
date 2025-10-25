@@ -6,7 +6,7 @@ import { z } from 'zod';
 const { executeKaliCommand } = require('./kali');
 const deepinfra = createDeepInfra({
   apiKey: process.env.DEEPINFRA_API_KEY,
-});
+});;
 let systemPrompt = `
 You are an AI pentesting assistant.
 Help the user formulate an attack plan and run commands on Kali linux on behalf of the user.
