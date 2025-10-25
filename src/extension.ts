@@ -28,6 +28,7 @@ let kaliTool = tool({
 let activePanel: vscode.WebviewPanel;
 
 export function activate(context: vscode.ExtensionContext) {
+  console.log('AI Pentester extension activated!');
   const disposable = vscode.commands.registerCommand('ai-pentester.activate', () => {
     activePanel = vscode.window.createWebviewPanel(
       'terminalInteractor',

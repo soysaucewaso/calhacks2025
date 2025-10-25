@@ -4,12 +4,11 @@
   "description": "AI pentester converts natural language requests into commands",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.105.0"
+    "vscode": "^1.99.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -46,5 +45,9 @@
     "@ai-sdk/deepinfra": "^1.0.23",
     "ai": "^5.0.76",
     "node-ssh": "^13.2.1"
-  }
+  },
+  "activationEvents": [
+    "onCommand:ai-pentester.helloWorld",
+    "onCommand:ai-pentester.activate"
+  ]
 }
