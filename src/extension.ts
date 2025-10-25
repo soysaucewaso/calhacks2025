@@ -268,6 +268,18 @@ function getWebviewContent() {
         border-radius: 6px;
         cursor: pointer;
       }
+      .loading {
+        color: #dcdcaa;
+        margin-top: 6px;
+        font-style: italic;
+        font-family: system-ui, sans-serif;
+        animation: blink 1.2s infinite ease-in-out;
+      }
+      @keyframes blink {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 1; }
+      }
+
       #input-container {
         display: flex;
         padding: 10px;
@@ -366,7 +378,18 @@ function getWebviewContent() {
 
           const yes = document.createElement('button');
           yes.textContent = 'Run Command';
-          yes.onclick = () => vscode.postMessage({ command: 'commandConfirmed', cmd });
+          yes.onclick = () => {
+            // Disable buttons and show loading
+            yes.disabled = true;
+            no.disabled = true;
+            yes.textContent = 'Running...';
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            loading.textContent = '⏳ Running command...';
+            wrapper.appendChild(loading);
+
+            vscode.postMessage({ command: 'commandConfirmed', cmd });
+          };
 
           const no = document.createElement('button');
           no.textContent = 'Cancel';
@@ -381,14 +404,18 @@ function getWebviewContent() {
         }
 
         if (command === 'commandOutput') {
-          // Show command output in a new assistant bubble
-          const wrapper = appendMessage('assistant', 'Command output:');
-          const outBlock = document.createElement('pre');
-          outBlock.className = 'output-block';
-          outBlock.textContent = output;
-          wrapper.appendChild(outBlock);
-          currentAssistantBubble = null;
-        }
+        // Remove any existing loading indicators
+        const loadings = document.querySelectorAll('.loading');
+        loadings.forEach(l => l.remove());
+
+        // Show command output in a new assistant bubble
+        const wrapper = appendMessage('assistant', 'Command output:');
+        const outBlock = document.createElement('pre');
+        outBlock.className = 'output-block';
+        outBlock.textContent = output;
+        wrapper.appendChild(outBlock);
+        currentAssistantBubble = null;
+      }
       });
     </script>
   </body>
