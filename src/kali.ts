@@ -4,9 +4,7 @@ const { getActivePanel } = require("./extension")
 import * as vscode from 'vscode';
 
 const ssh = new NodeSSH();
-
-let extensionPanel: vscode.WebviewPanel | undefined;
-export async function executeKaliCommand(commandStr: string){
+export async function executeKaliCommand(commandStr: string, extensionPanel: vscode.WebviewPanel | undefined, waitForConfirm: boolean = false){
     if (!extensionPanel){
         extensionPanel = getActivePanel();
     }

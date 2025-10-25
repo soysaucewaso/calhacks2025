@@ -36,66 +36,52 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.executeKaliCommand = executeKaliCommand;
-var NodeSSH = require("node-ssh").NodeSSH;
-var getActivePanel = require("./extension").getActivePanel;
-var ssh = new NodeSSH();
-function executeKaliCommand(commandStr_1, extensionPanel_1) {
-    return __awaiter(this, arguments, void 0, function (commandStr, extensionPanel, waitForConfirm) {
-        if (waitForConfirm === void 0) { waitForConfirm = false; }
+var assert = require("assert");
+var reportapi_1 = require("../reportapi");
+suite('reportapi.generateReport', function () {
+    test('aggregates per-constraint JSON results using injected llmCall and constraints', function () { return __awaiter(void 0, void 0, void 0, function () {
+        var constraints, llmCall, result, i, expected, actual;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    if (!extensionPanel) {
-                        extensionPanel = getActivePanel();
-                    }
-                    console.log('Extension panel active');
-                    extensionPanel.webview.postMessage({ command: 'confirmCommand', text: commandStr });
-                    return [4 /*yield*/, new Promise(function (resolve) {
-                            var listener = extensionPanel.webview.onDidReceiveMessage(function (message) {
-                                if (message.command === "commandConfirmed") {
-                                    resolve(true);
-                                    listener.dispose(); // clean up listener
-                                }
-                                else if (message.command === "commandRejected") {
-                                    resolve(false);
-                                    listener.dispose(); // clean up listener
-                                }
-                            });
-                        })];
+                    constraints = [
+                        { name: 'Constraint A', section: 'S1', granular: 'Do X', kaliTest: 'Try X' },
+                        { name: 'Constraint B', section: 'S2', granular: 'Do Y', kaliTest: 'Try Y' },
+                    ];
+                    llmCall = function (messages) { return __awaiter(void 0, void 0, void 0, function () {
+                        var userMsg, payload;
+                        return __generator(this, function (_a) {
+                            userMsg = messages.find(function (m) { return m.role === 'user'; });
+                            assert.ok(userMsg, 'User message should exist');
+                            assert.strictEqual(typeof userMsg.content, 'string');
+                            payload = JSON.parse(userMsg.content);
+                            // Return a valid JSON string as the model output
+                            return [2 /*return*/, JSON.stringify({
+                                    constraint: payload.constraint_name,
+                                    status: 'PASS',
+                                    evidence: "Checked ".concat(payload.constraint_description),
+                                    commands: [payload.constraint_suggested_strategy].filter(Boolean),
+                                })];
+                        });
+                    }); };
+                    return [4 /*yield*/, (0, reportapi_1.generateReport)('OWASP', ['127.0.0.1'], { llmCall: llmCall, constraints: constraints })];
                 case 1:
-                    _a.sent();
-                    return [4 /*yield*/, executeKali(commandStr)];
-                case 2: return [2 /*return*/, _a.sent()];
-            }
-        });
-    });
-}
-function executeKali(commandStr) {
-    return __awaiter(this, void 0, void 0, function () {
-        var result;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    console.log(commandStr);
-                    return [4 /*yield*/, ssh.connect({
-                            // host: "192.168.128.2",   // Your Kali VM IP
-                            host: "8.tcp.ngrok.io",
-                            port: 11149,
-                            username: "aiproxy",
-                            password: "aiproxy", // or use privateKey: "~/.ssh/id_rsa"
-                        })];
-                case 1:
-                    _a.sent();
-                    return [4 /*yield*/, ssh.execCommand(commandStr)];
-                case 2:
                     result = _a.sent();
-                    console.log("STDOUT:", result.stdout);
-                    console.log("STDERR:", result.stderr);
-                    ssh.dispose();
-                    return [2 /*return*/, { stdout: result.stdout, stderr: result.stderr }];
+                    assert.ok(result, 'Result should be defined');
+                    assert.deepStrictEqual(result.benchmark, 'OWASP');
+                    assert.deepStrictEqual(result.targets, ['127.0.0.1']);
+                    assert.ok(Array.isArray(result.results));
+                    assert.strictEqual(result.results.length, constraints.length);
+                    for (i = 0; i < constraints.length; i++) {
+                        expected = constraints[i];
+                        actual = result.results[i];
+                        assert.strictEqual(actual.constraint, expected.name);
+                        assert.strictEqual(actual.status, 'PASS');
+                        assert.ok(typeof actual.evidence === 'string');
+                        assert.ok(Array.isArray(actual.commands));
+                    }
+                    return [2 /*return*/];
             }
         });
-    });
-}
-//console.log(await executeKaliCommand('ls && pw'));
+    }); });
+});

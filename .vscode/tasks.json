@@ -14,7 +14,12 @@
 			"group": {
 				"kind": "build",
 				"isDefault": true
-			}
+			},
+      "options": {
+        "env": {
+          "DEEPINFRA_API_KEY": "${env:DEEPINFRA_API_KEY}" // pull from your OS env OR put value here (not recommended)
+        }
+      },
 		}
 	]
 }
