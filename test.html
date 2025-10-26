@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cybersecurity Educator Test</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;">
+    <h1>🛡️ Cybersecurity Learning Assistant</h1>
+    <p>Describe a security mistake and get educational recommendations:</p>
+    
+    <input id="mistake" type="text" placeholder="e.g., I clicked on a phishing email link" 
+           style="width: 70%; padding: 10px; margin: 10px 0;">
+    <button onclick="getHelp()" style="padding: 10px 20px;">Get Help</button>
+    
+    <div id="result" style="margin-top: 20px; padding: 20px; background: #f5f5f5; border-radius: 5px;"></div>
+
+    <script>
+        async function getHelp() {
+            const mistake = document.getElementById('mistake').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!mistake) {
+                resultDiv.innerHTML = 'Please describe a security mistake first.';
+                return;
+            }
+            
+            resultDiv.innerHTML = 'Searching for educational content...';
+            
+            try {
+                const response = await fetch('https://serpapi.com/search.json?engine=youtube&search_query=' + 
+                    encodeURIComponent(mistake + ' cybersecurity tutorial') + 
+                    '&api_key=2127272233d7915fe37c41b0f0cf8bfe28feb8898747ec0e5c79cdfe7f1afc7e');
+                
+                const data = await response.json();
+                
+                let html = '<h3>📚 Educational Resources:</h3>';
+                
+                if (data.video_results) {
+                    data.video_results.slice(0, 3).forEach(video => {
+                        html += `
+                            <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+                                <h4><a href="${video.link}" target="_blank">🎥 ${video.title}</a></h4>
+                                <p>${video.description || 'YouTube video tutorial'}</p>
+                            </div>
+                        `;
+                    });
+                }
+                
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.innerHTML = 'Error fetching educational content. Please try again.';
+            }
+        }
+    </script>
+</body>
+</html>

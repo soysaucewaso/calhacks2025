@@ -38,8 +38,40 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executeKaliCommand = executeKaliCommand;
 var NodeSSH = require("node-ssh").NodeSSH;
+var getActivePanel = require("./extension").getActivePanel;
 var ssh = new NodeSSH();
-function executeKaliCommand(commandStr) {
+function executeKaliCommand(commandStr_1, extensionPanel_1) {
+    return __awaiter(this, arguments, void 0, function (commandStr, extensionPanel, waitForConfirm) {
+        if (waitForConfirm === void 0) { waitForConfirm = false; }
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    if (!extensionPanel) {
+                        extensionPanel = getActivePanel();
+                    }
+                    console.log('Extension panel active');
+                    extensionPanel.webview.postMessage({ command: 'confirmCommand', text: commandStr });
+                    return [4 /*yield*/, new Promise(function (resolve) {
+                            var listener = extensionPanel.webview.onDidReceiveMessage(function (message) {
+                                if (message.command === "commandConfirmed") {
+                                    resolve(true);
+                                    listener.dispose(); // clean up listener
+                                }
+                                else if (message.command === "commandRejected") {
+                                    resolve(false);
+                                    listener.dispose(); // clean up listener
+                                }
+                            });
+                        })];
+                case 1:
+                    _a.sent();
+                    return [4 /*yield*/, executeKali(commandStr)];
+                case 2: return [2 /*return*/, _a.sent()];
+            }
+        });
+    });
+}
+function executeKali(commandStr) {
     return __awaiter(this, void 0, void 0, function () {
         var result;
         return __generator(this, function (_a) {
@@ -47,7 +79,9 @@ function executeKaliCommand(commandStr) {
                 case 0:
                     console.log(commandStr);
                     return [4 /*yield*/, ssh.connect({
-                            host: "192.168.128.2", // Your Kali VM IP
+                            // host: "192.168.128.2",   // Your Kali VM IP
+                            host: "8.tcp.ngrok.io",
+                            port: 11149,
                             username: "aiproxy",
                             password: "aiproxy", // or use privateKey: "~/.ssh/id_rsa"
                         })];
@@ -64,3 +98,4 @@ function executeKaliCommand(commandStr) {
         });
     });
 }
+//console.log(await executeKaliCommand('ls && pw'));

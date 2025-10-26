@@ -4,12 +4,11 @@
   "description": "AI pentester converts natural language requests into commands",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.105.0"
+    "vscode": "^1.99.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -40,11 +39,13 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p tsconfig.build.json",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "api": "npm run compile && node src/test/reportapi.test.js",
+    "wss": "npm run compile && node out/wss.js"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
