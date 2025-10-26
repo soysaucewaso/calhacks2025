@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Settings,
   Terminal,
+  Code2,
 } from 'lucide-react';
 
 import {
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/playbook', icon: ShieldCheck, label: 'Playbook' },
   { href: '/reports', icon: History, label: 'Reports' },
   { href: '/training', icon: GraduationCap, label: 'Training' },
+  { href: '/code-rabbit', icon: Code2, label: 'CodeRabbit' },
 ];
 
 export function SidebarNav() {
