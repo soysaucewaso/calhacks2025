@@ -44,14 +44,43 @@ export class CodeRabbitAnalyzer {
         prNumber: number
     ): Promise<SecurityIssue[]> {
         try {
-            // Fetch the pull request details
+            // Use CodeRabbit API v1/review endpoint with repo URL
+            const repoUrl = `https://github.com/${owner}/${repo}`;
+            const response = await axios.post(
+                'https://api.coderabbit.ai/v1/review',
+                {
+                    repo_url: repoUrl,
+                    pr_number: prNumber,
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            // Transform CodeRabbit response to our SecurityIssue format
+            if (response.data && response.data.issues) {
+                return response.data.issues.map((issue: any) => ({
+                    severity: issue.severity || this.mapSeverity(issue.level),
+                    category: issue.category || issue.type || 'Security',
+                    title: issue.title || issue.message || 'Security issue',
+                    description: issue.description || issue.message || 'No description provided',
+                    file: issue.file_path || issue.file || 'unknown',
+                    line: issue.line_number || issue.line || 0,
+                    code: issue.code_snippet || issue.code || '',
+                }));
+            }
+
+            // Fallback: perform local analysis
             const { data: pr } = await this.octokit.pulls.get({
                 owner,
                 repo,
                 pull_number: prNumber,
             });
 
-            // Fetch the diff using the correct API call
+            // Fetch the diff for local analysis
             const diffResponse = await this.octokit.request(
                 `GET /repos/${owner}/${repo}/pulls/${prNumber}`,
                 {
@@ -67,49 +96,67 @@ export class CodeRabbitAnalyzer {
                 }
             );
 
-            // Analyze the code using CodeRabbit API
-            const analysis = await this.analyzeCode(typeof diffResponse.data === 'string' ? diffResponse.data : JSON.stringify(diffResponse.data), {
-                owner,
-                repo,
-                branch: pr.head.ref,
-                prNumber,
-            });
-
+            const diffData = typeof diffResponse.data === 'string' ? diffResponse.data : JSON.stringify(diffResponse.data);
+            const analysis = this.performLocalSecurityAnalysis(diffData);
             return analysis.review.issues;
-        } catch (error) {
-            console.error('Error analyzing pull request:', error);
-            throw error;
+
+        } catch (error: any) {
+            console.error('Error analyzing pull request:', error.response?.data || error.message);
+            
+            // Fallback to local analysis
+            try {
+                const diffResponse = await this.octokit.request(
+                    `GET /repos/${owner}/${repo}/pulls/${prNumber}`,
+                    {
+                        mediaType: { format: 'diff' },
+                        headers: { accept: 'application/vnd.github.v3.diff' },
+                    }
+                );
+                const diffData = typeof diffResponse.data === 'string' ? diffResponse.data : JSON.stringify(diffResponse.data);
+                const analysis = this.performLocalSecurityAnalysis(diffData);
+                return analysis.review.issues;
+            } catch (fallbackError) {
+                throw error;
+            }
         }
     }
 
-    private async analyzeCode(
-        code: string,
-        context: { owner: string; repo: string; branch: string; prNumber: number }
+    private mapSeverity(level: string): 'critical' | 'high' | 'medium' | 'low' | 'info' {
+        const mapping: Record<string, 'critical' | 'high' | 'medium' | 'low' | 'info'> = {
+            'critical': 'critical',
+            'error': 'critical',
+            'high': 'high',
+            'warning': 'high',
+            'medium': 'medium',
+            'low': 'low',
+            'info': 'info',
+        };
+        return mapping[level?.toLowerCase() || ''] || 'medium';
+    }
+
+    private async analyzeCodeViaCodeRabbit(
+        repoUrl: string,
+        prNumber: number
     ): Promise<CodeRabbitResponse> {
         try {
-            const response = await axios.post<CodeRabbitResponse>(
-                'https://api.coderabbit.ai/v1/analyze',
+            const response = await axios.post(
+                'https://api.coderabbit.ai/v1/review',
                 {
-                    code,
-                    context,
-                    settings: {
-                        focus: ['security', 'best-practices', 'performance'],
-                        language: 'auto',
-                    },
+                    repo_url: repoUrl,
+                    pr_number: prNumber,
                 },
                 {
                     headers: {
-                        Authorization: `Bearer ${this.apiKey}`,
+                        'Authorization': `Bearer ${this.apiKey}`,
                         'Content-Type': 'application/json',
                     },
                 }
             );
 
             return response.data;
-        } catch (error) {
-            console.error('CodeRabbit API error:', error);
-            // Fallback: perform basic security analysis locally
-            return this.performLocalSecurityAnalysis(code);
+        } catch (error: any) {
+            console.error('CodeRabbit API error:', error.response?.data || error.message);
+            throw error;
         }
     }
 
