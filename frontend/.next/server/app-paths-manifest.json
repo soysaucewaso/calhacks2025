@@ -1,5 +1,3 @@
 {
-  "/playbook/page": "app/playbook/page.js",
-  "/code-rabbit/page": "app/code-rabbit/page.js",
   "/page": "app/page.js"
 }
