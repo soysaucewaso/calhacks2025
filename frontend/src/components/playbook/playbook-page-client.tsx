@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -33,11 +34,13 @@ import { useToast } from "@/hooks/use-toast";
 import { getSuggestedTasks } from "@/app/playbook/actions";
 import { type SuggestPentestPlaybookTasksOutput } from "@/ai/flows/suggest-pentest-playbook-tasks";
 import { TaskCard } from "./task-card";
-import { Bot, Loader2, Play, TestTube2, Shield, LayoutDashboard } from "lucide-react";
+import { VulnerabilityDashboard } from "@/components/reports/vulnerability-dashboard";
+import { AuzLandREDashboard } from "@/components/reports/auzlandre-dashboard";
+import { Bot, Loader2, Play, TestTube2, Shield, LayoutDashboard, AlertTriangle } from "lucide-react";
 import { Separator } from "../ui/separator";
 
 const FormSchema = z.object({
-  target: z.enum(["Juice Shop", "Metasploitable"], {
+  target: z.enum(["Juice Shop", "Metasploitable", "testphp.vulnweb.com", "auzlandre.com.au"], {
     required_error: "Please select a target.",
   }),
   benchmark: z.enum(["NIST SP 800-115", "OWASP Top 10 (web apps)", "PCI DSS", "CIS Controls", "HIPAA"], {
@@ -49,11 +52,33 @@ export function PlaybookPageClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [tasks, setTasks] = useState<SuggestPentestPlaybookTasksOutput>([]);
   const [approvedTasks, setApprovedTasks] = useState<Set<string>>(new Set());
+  const [isScanning, setIsScanning] = useState(false);
+  const [showVulnerabilities, setShowVulnerabilities] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
   });
+
+  // Handle vulnerability scanning animation
+  useEffect(() => {
+    const selectedTarget = form.watch('target');
+    if (selectedTarget === 'testphp.vulnweb.com' || selectedTarget === 'auzlandre.com.au') {
+      setShowVulnerabilities(false);
+      setIsScanning(true);
+      
+      // Simulate scanning for 3 seconds
+      const timer = setTimeout(() => {
+        setIsScanning(false);
+        setShowVulnerabilities(true);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setIsScanning(false);
+      setShowVulnerabilities(false);
+    }
+  }, [form.watch('target')]);
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     setIsLoading(true);
@@ -208,6 +233,20 @@ export function PlaybookPageClient() {
                               <span>Metasploitable</span>
                             </div>
                           </SelectItem>
+                          <SelectItem value="testphp.vulnweb.com">
+                            <div className="flex items-center gap-2">
+                              <TestTube2 className="h-4 w-4 text-red-500" />
+                              <span>testphp.vulnweb.com (PHP 5.6.40 - EOL)</span>
+                              <Badge variant="destructive" className="ml-1">EOL</Badge>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="auzlandre.com.au">
+                            <div className="flex items-center gap-2">
+                              <TestTube2 className="h-4 w-4 text-orange-500" />
+                              <span>auzlandre.com.au (FreeBSD 13.1)</span>
+                              <Badge variant="destructive" className="ml-1">CVEs</Badge>
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -283,6 +322,66 @@ export function PlaybookPageClient() {
           </form>
         </Form>
       </Card>
+
+      {/* Show vulnerability dashboard for testphp.vulnweb.com */}
+      {form.watch('target') === 'testphp.vulnweb.com' && (
+        <Card className="border-red-300">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              PHP 5.6.40 Vulnerability Assessment
+            </CardTitle>
+            <CardDescription>
+              {isScanning ? "Scanning target for vulnerabilities..." : "Critical security vulnerabilities detected in this target"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isScanning ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-red-600" />
+                <div className="text-center space-y-2">
+                  <p className="font-semibold text-lg">Generating Vulnerability Assessment</p>
+                  <p className="text-sm text-muted-foreground">
+                    Scanning PHP version, known CVEs, and security patches...
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <VulnerabilityDashboard />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Show vulnerability dashboard for auzlandre.com.au */}
+      {form.watch('target') === 'auzlandre.com.au' && (
+        <Card className="border-orange-300">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              FreeBSD 13.1 & Infrastructure Vulnerability Assessment
+            </CardTitle>
+            <CardDescription>
+              {isScanning ? "Scanning target for vulnerabilities..." : "Critical OS vulnerabilities and infrastructure analysis detected"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isScanning ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-orange-600" />
+                <div className="text-center space-y-2">
+                  <p className="font-semibold text-lg">Generating Vulnerability Assessment</p>
+                  <p className="text-sm text-muted-foreground">
+                    Scanning FreeBSD version, known CVEs, AWS infrastructure, and security patches...
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <AuzLandREDashboard />
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {(isLoading || tasks.length > 0) && (
         <Card>
