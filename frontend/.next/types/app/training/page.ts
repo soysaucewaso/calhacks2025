@@ -1,4 +1,4 @@
-// File: /Users/saikhushaldulam/calhacks2025/frontend/app/training/page.tsx
+// File: C:\Users\sanch\Downloads\calhacks2025-main\frontend\app\training\page.tsx
 import * as entry from '../../../../app/training/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
