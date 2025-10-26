@@ -34,8 +34,28 @@ function getKaliTool() {
 }
 // Load constraints for a known benchmark from assets CSV files
 async function benchmarkToConstraints(benchmark: string): Promise<Array<{name: string; section: string; granular: string; kaliTest: string;}>> {
-  if (benchmark !== 'OWASP') return [];
-  const csvPath = path.resolve(__dirname,  '..', 'assets', 'OWASP.csv');
+  let csvName = '';
+  switch (benchmark) {
+    case 'OWASP':
+      csvName = 'OWASP';
+      break;
+    case 'PCI DSS':
+      csvName = 'PCI';
+      break;
+    case 'NIST SP 800-115':
+      csvName = 'NIST';
+      break;
+    case 'CIS Controls':
+      csvName = 'CIS';
+      break;
+    case 'HIPAA':
+      csvName = 'HIPAA';
+      break;
+    case 'GDPR':
+      csvName = 'GDPR';
+      break;
+  }
+  const csvPath = path.resolve(__dirname,  '..', 'assets', csvName + '.csv');
   const csvText = await fs.promises.readFile(csvPath, 'utf-8');
   const rows = parseCsv(csvText);
   // Map CSV headers to our normalized object keys
@@ -170,7 +190,13 @@ export async function generateReport(
       const evidence = typeof parsed.evidence === 'string' ? parsed.evidence : JSON.stringify(parsed.evidence ?? '');
       const commands = Array.isArray(parsed.commands) ? parsed.commands : [];
       results.push({ constraint: constraintName, section: section, description: granular, strategy: kaliTest, status:  status, evidence: evidence, commands: commands });
-    } catch {
+    } catch (err) {
+      console.error('generateReport JSON parse error', {
+        constraint: name,
+        section,
+        responsePreview: String(responseText).slice(0, 500),
+        error: err instanceof Error ? err.message : String(err),
+      });
       results.push({ constraint: name, section: section, description: granular, strategy: kaliTest, status: 'NOT TESTABLE', evidence: responseText, commands: null });
     }
   }

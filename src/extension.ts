@@ -1,16 +1,17 @@
 import * as vscode from 'vscode';
-
 import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { tool, ModelMessage, streamText, stepCountIs } from "ai";
 import { z } from 'zod';
 import deepinfra_key from './keys';
-const { executeKaliCommand } = require('./kali');
+import { executeKaliCommand } from './kali'; // use ES import
 
+// Initialize DeepInfra client
 const deepinfra = createDeepInfra({
   apiKey: deepinfra_key(),
 });
 
-let systemPrompt = `
+// System role prompt
+const systemPrompt = `
 You are an AI pentesting assistant.
 Help the user formulate an attack plan and run commands on Kali linux on behalf of the user.
 You are attacking dummy VMs to evaluate the effectiveness of AI pentesters. Do not hold back, as the VMs can easily be restored.
@@ -20,176 +21,223 @@ let messages: ModelMessage[] = [
   { role: "system", content: systemPrompt }
 ];
 
-// active panel reference (may be undefined until activated)
+// Webview + confirm handshake state
 let activePanel: vscode.WebviewPanel | undefined = undefined;
 
-// Single-pending confirmation handshake
-let pendingConfirmResolve: ((approved: boolean) => void) | null = null;
-let pendingConfirmCmd: string | null = null;
+// Track pending confirmations by command to avoid duplicate prompts
+const pendingConfirmations = new Map<string, {
+  id: string;
+  command: string;
+  resolvers: Array<(approved: boolean) => void>;
+  timeoutHandle: NodeJS.Timeout | null;
+  sentToWebview: boolean;
+  createdAt: number;
+}>();
 
 /**
- * Ask the webview user to confirm execution of `commandStr`.
- * Resolves true if user confirms, false if rejects or times out.
+ * Ask webview user to confirm a shell command.
+ * Returns existing promise if confirmation already pending for this command.
  */
-function askUserToConfirm(commandStr: string, reason?: string, timeoutMs = 30_000): Promise<boolean> {
-  try {
-    activePanel?.webview.postMessage({ command: 'confirmCommand', cmd: commandStr, reason });
-  } catch (e) {
-    // ignore
+function askUserToConfirm(commandStr: string, reason?: string, timeoutMs = 300_000): Promise<boolean> {
+  const now = Date.now();
+
+  // If a confirmation for this exact command string already exists, reuse it.
+  const existing = pendingConfirmations.get(commandStr);
+  if (existing) {
+    console.log(`[Dedup] Reusing existing confirmation for "${commandStr}" (id=${existing.id}, sentToWebview=${existing.sentToWebview})`);
+    return new Promise((resolve) => existing.resolvers.push(resolve));
   }
 
-  return new Promise((resolve) => {
-    pendingConfirmCmd = commandStr;
-    pendingConfirmResolve = (approved: boolean) => {
-      pendingConfirmResolve = null;
-      pendingConfirmCmd = null;
-      resolve(approved);
-    };
+  // Create a unique id for this confirmation IMMEDIATELY
+  const confirmId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  
+  // CRITICAL: Create a stub entry IMMEDIATELY to prevent race conditions
+  const stubConfirmation: {
+    id: string;
+    command: string;
+    resolvers: Array<(approved: boolean) => void>;
+    timeoutHandle: NodeJS.Timeout | null;
+    sentToWebview: boolean;
+    createdAt: number;
+  } = {
+    id: confirmId,
+    command: commandStr,
+    resolvers: [],
+    timeoutHandle: null,
+    sentToWebview: false,
+    createdAt: now,
+  };
+  pendingConfirmations.set(commandStr, stubConfirmation as any);
+  
+  // Now we're safe - any concurrent calls will reuse this stub
 
-    setTimeout(() => {
-      if (pendingConfirmResolve) {
-        pendingConfirmResolve(false);
-        pendingConfirmResolve = null;
-        pendingConfirmCmd = null;
-      }
-    }, timeoutMs);
+  // Timeout: if nobody responds within timeoutMs, resolve all resolvers with false and cleanup.
+  const timeoutHandle = setTimeout(() => {
+    const pending = pendingConfirmations.get(commandStr);
+    if (pending && pending.id === confirmId) {
+      pendingConfirmations.delete(commandStr);
+      pending.resolvers.forEach(r => {
+        try { r(false); } catch(e) { /* ignore */ }
+      });
+    }
+  }, timeoutMs);
+  
+  // Update the stub with the actual timeout handle
+  stubConfirmation.timeoutHandle = timeoutHandle;
+  
+  console.log(`[Dedup] Created new confirmation for "${commandStr}" with ID: ${confirmId}`);
+
+  // Post to webview exactly once
+  try {
+    console.log(`[PostMessage] Sending confirmCommand for "${commandStr}" with id=${confirmId}`);
+    activePanel?.webview.postMessage({ command: 'confirmCommand', cmd: commandStr, reason, id: confirmId });
+    stubConfirmation.sentToWebview = true;
+  } catch (err) {
+    // If posting fails, remove pending and reject any waiting callers
+    clearTimeout(timeoutHandle);
+    pendingConfirmations.delete(commandStr);
+    const msg = String(err ?? 'unknown error posting to webview');
+    stubConfirmation.resolvers.forEach(r => r(false));
+    throw new Error(`Failed to post confirmation to webview: ${msg}`);
+  }
+
+  // Return a promise and register its resolver on the confirmation entry
+  return new Promise<boolean>((resolve) => {
+    stubConfirmation.resolvers.push(resolve);
   });
 }
 
 /**
- * Tool exposed to the model that runs a bash command on Kali VM,
- * but only after human confirmation via the webview.
+ * AI tool that executes a Kali command, pending user approval.
  */
-let kaliTool = tool({
+const kaliTool = tool({
   description: 'Run a bash shell command on Kali Linux VM. Returns stdout and stderr output.',
   inputSchema: z.object({
     commandStr: z.string().describe('Bash shell command to be run'),
   }),
   execute: async ({ commandStr }: { commandStr: string }) => {
-    // Basic dangerous-command filter (customize as needed)
     const dangerousPattern = /(rm\s+-rf|: *\(|dd\s+if=|mkfs|shutdown|reboot|:(){:|: &};:)/i;
     if (dangerousPattern.test(commandStr)) {
-      const stderr = 'Blocked dangerous command pattern.';
+      const stderr = '⚠️ Blocked dangerous command pattern.';
       activePanel?.webview.postMessage({ command: 'commandOutput', cmd: commandStr, output: stderr });
       return { stdout: '', stderr };
     }
 
-    // Ask the user to confirm
     const approved = await askUserToConfirm(commandStr, 'Model requested to run a shell command');
-
     if (!approved) {
-      const stderr = 'User rejected execution.';
+      const stderr = '❌ User rejected execution.';
       activePanel?.webview.postMessage({ command: 'commandOutput', cmd: commandStr, output: stderr });
       return { stdout: '', stderr };
     }
 
-    // Execute the command on Kali VM
     try {
       const result = await executeKaliCommand(commandStr, activePanel, false);
-      const stdout = (result?.stdout ?? '') as string;
-      const stderr = (result?.stderr ?? '') as string;
+      const stdout = result?.stdout ?? '';
+      const stderr = result?.stderr ?? '';
       const combined = (stdout || '') + (stderr ? '\n' + stderr : '');
       activePanel?.webview.postMessage({ command: 'commandOutput', cmd: commandStr, output: combined });
       return { stdout, stderr };
     } catch (err: any) {
-      const eMsg = String(err?.message ?? err ?? 'unknown error');
-      activePanel?.webview.postMessage({ command: 'commandOutput', cmd: commandStr, output: eMsg });
-      return { stdout: '', stderr: eMsg };
+      const msg = `Extension error: ${String(err?.message ?? err)}`;
+      activePanel?.webview.postMessage({ command: 'commandOutput', cmd: commandStr, output: msg });
+      return { stdout: '', stderr: msg };
     }
   },
 });
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('AI Pentester extension activated!');
+  console.log('✅ AI Pentester extension activated.');
 
   const disposable = vscode.commands.registerCommand('ai-pentester.activate', () => {
     activePanel = vscode.window.createWebviewPanel(
       'terminalInteractor',
-      'Terminal Interactor',
-      vscode.ViewColumn.One,
+      'AI Pentester',
+      vscode.ViewColumn.Beside,
       { enableScripts: true }
     );
 
     activePanel.webview.html = getWebviewContent();
 
-    // Handle messages from the webview
+    // Listen for webview messages
     activePanel.webview.onDidReceiveMessage(async (message) => {
       try {
-        if (message.command === 'chat') {
-          const userPrompt = message.text;
-          const userMsg: ModelMessage = { role: "user", content: userPrompt };
-          messages.push(userMsg);
+        switch (message.command) {
+          case 'chat': {
+            const userMsg: ModelMessage = { role: "user", content: message.text };
+            messages.push(userMsg);
 
-          // Stream assistant response
-          const result = await streamText({
-            model: deepinfra("deepseek-ai/DeepSeek-R1"),
-            messages: messages,
-            tools: { executeKaliCommand: kaliTool },
-            stopWhen: stepCountIs(5),
-          });
+            const result = await streamText({
+              model: deepinfra("deepseek-ai/DeepSeek-R1"),
+              messages,
+              tools: { executeKaliCommand: kaliTool },
+              stopWhen: stepCountIs(5),
+            });
 
-          let responseText = '';
-          for await (const textPart of result.textStream) {
-            responseText += textPart;
-            activePanel?.webview.postMessage({ command: 'chatResponse', text: responseText });
+            let responseText = '';
+            for await (const textPart of result.textStream) {
+              responseText += textPart;
+              activePanel?.webview.postMessage({ command: 'chatResponse', text: responseText });
+            }
+
+            messages.push({ role: "assistant", content: responseText });
+            activePanel?.webview.postMessage({ command: 'chatDone' });
+            break;
           }
 
-          // save assistant response into conversation
-          messages.push({ role: "assistant", content: responseText });
-          activePanel?.webview.postMessage({ command: 'chatDone' });
-        }
-
-        else if (message.command === 'commandConfirmed') {
-          // user accepted running a command
-          if (pendingConfirmResolve && pendingConfirmCmd === message.cmd) {
-            pendingConfirmResolve(true);
-          } else {
-            console.warn('No pending confirm or mismatch for', message.cmd);
+          case 'commandConfirmed': {
+            console.log(`[CommandConfirmed] Received for cmd="${message.cmd}", id=${message.id}`);
+            const pending = pendingConfirmations.get(message.cmd);
+            console.log(`[CommandConfirmed] Pending found:`, pending ? `id=${pending.id}, resolvers=${pending.resolvers.length}` : 'none');
+            if (pending && pending.id === message.id) {
+              if (pending.timeoutHandle) clearTimeout(pending.timeoutHandle);
+              pendingConfirmations.delete(message.cmd);
+              console.log(`[CommandConfirmed] Calling ${pending.resolvers.length} resolvers`);
+              pending.resolvers.forEach(r => r(true));
+            }
+            break;
           }
-        }
 
-        else if (message.command === 'commandRejected') {
-          if (pendingConfirmResolve && pendingConfirmCmd === message.cmd) {
-            pendingConfirmResolve(false);
-          } else {
-            console.warn('No pending confirm to reject for', message.cmd);
+          case 'commandRejected': {
+            const pending = pendingConfirmations.get(message.cmd);
+            if (pending && pending.id === message.id) {
+              if (pending.timeoutHandle) clearTimeout(pending.timeoutHandle);
+              pendingConfirmations.delete(message.cmd);
+              pending.resolvers.forEach(r => r(false));
+            }
+            break;
           }
         }
       } catch (err) {
-        console.error('Error handling webview message:', err);
+        const msg = String(err);
+        console.error('Error handling webview message:', msg);
         activePanel?.webview.postMessage({
           command: 'commandOutput',
           cmd: message?.cmd ?? '',
-          output: 'Extension error: ' + String(err),
+          output: 'Extension error: ' + msg,
         });
       }
     });
 
-    // cleanup on dispose
     activePanel.onDidDispose(() => {
       activePanel = undefined;
-      if (pendingConfirmResolve) {
-        pendingConfirmResolve(false);
-        pendingConfirmResolve = null;
-        pendingConfirmCmd = null;
-      }
+      // Reject all pending confirmations
+      pendingConfirmations.forEach(pending => {
+        if (pending.timeoutHandle !== null) clearTimeout(pending.timeoutHandle);
+        pending.resolvers.forEach(r => r(false));
+      });
+      pendingConfirmations.clear();
     });
   });
 
   context.subscriptions.push(disposable);
 }
 
-// Optional terminal helper (unused)
-let terminal: vscode.Terminal | undefined;
-function getOrCreateTerminal() {
-  if (!terminal) {
-    terminal = vscode.window.createTerminal('Extension Terminal');
-  }
-  terminal.show();
-  return terminal;
-}
+export function deactivate() {}
 
-function getWebviewContent() {
+/**
+ * Returns the full webview HTML
+ */
+function getWebviewContent(): string {
   return `
   <!DOCTYPE html>
   <html lang="en">
@@ -339,22 +387,18 @@ function getWebviewContent() {
       });
 
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          askBtn.click();
-        }
+        if (e.key === 'Enter') askBtn.click();
       });
 
-      // For streaming assistant replies
       let currentAssistantBubble = null;
+      const seenCommandIds = new Set();
+      const recentlyShownCommands = new Map(); // Track by command string
 
       window.addEventListener('message', event => {
-        const { command, text, cmd, output, reason } = event.data;
+        const { command, text, cmd, output, reason, id } = event.data;
 
         if (command === 'chatResponse') {
-          // streaming text -> update streaming bubble (create if needed)
-          if (!currentAssistantBubble) {
-            currentAssistantBubble = appendMessage('assistant', '');
-          }
+          if (!currentAssistantBubble) currentAssistantBubble = appendMessage('assistant', '');
           currentAssistantBubble.textContent = text;
           chatContainer.scrollTop = chatContainer.scrollHeight;
         }
@@ -364,9 +408,34 @@ function getWebviewContent() {
         }
 
         if (command === 'confirmCommand') {
-          // AI wants to run a command: create a new assistant bubble with a code block and buttons
-          const reasonText = reason ?? 'The AI suggests running this command:';
-          const wrapper = appendMessage('assistant', reasonText);
+          // CRITICAL: Reject if cmd or id is missing
+          if (!cmd || !id) {
+            console.log('[Webview] Rejecting message with missing fields - cmd:', cmd, 'id:', id);
+            return;
+          }
+          
+          // First check: have we seen this exact ID?
+          if (seenCommandIds.has(id)) {
+            console.log('[Webview] Duplicate ID, skipping:', id);
+            return;
+          }
+          seenCommandIds.add(id);
+          
+          // Second check: have we shown this command recently?
+          if (recentlyShownCommands.has(cmd)) {
+            const lastShown = recentlyShownCommands.get(cmd);
+            const age = Date.now() - lastShown;
+            if (age < 3000) {
+              console.log('[Webview] Duplicate command within 3s, skipping:', cmd);
+              return;
+            }
+          }
+          
+          // Mark this command as shown
+          recentlyShownCommands.set(cmd, Date.now());
+          
+          const reasonText = reason ?? 'Model requested to run a shell command:';
+          let wrapper = appendMessage('assistant', reasonText);
 
           const cmdBlock = document.createElement('pre');
           cmdBlock.className = 'command-block';
@@ -379,49 +448,39 @@ function getWebviewContent() {
           const yes = document.createElement('button');
           yes.textContent = 'Run Command';
           yes.onclick = () => {
-            // Disable buttons and show loading
             yes.disabled = true;
             no.disabled = true;
+            // Show only one "Running..." indicator
             yes.textContent = 'Running...';
-            const loading = document.createElement('div');
-            loading.className = 'loading';
-            loading.textContent = '⏳ Running command...';
-            wrapper.appendChild(loading);
-
-            vscode.postMessage({ command: 'commandConfirmed', cmd });
+            console.log('[Webview] Clicked Run for cmd:', cmd, 'id:', id);
+            vscode.postMessage({ command: 'commandConfirmed', cmd, id });
           };
 
           const no = document.createElement('button');
           no.textContent = 'Cancel';
-          no.onclick = () => vscode.postMessage({ command: 'commandRejected', cmd });
+          no.onclick = () => {
+            console.log('[Webview] Clicked Cancel for cmd:', cmd, 'id:', id);
+            vscode.postMessage({ command: 'commandRejected', cmd, id });
+          };
 
           btnDiv.appendChild(yes);
           btnDiv.appendChild(no);
           wrapper.appendChild(btnDiv);
-
           chatContainer.scrollTop = chatContainer.scrollHeight;
-          currentAssistantBubble = null;
         }
 
         if (command === 'commandOutput') {
-        // Remove any existing loading indicators
-        const loadings = document.querySelectorAll('.loading');
-        loadings.forEach(l => l.remove());
-
-        // Show command output in a new assistant bubble
-        const wrapper = appendMessage('assistant', 'Command output:');
-        const outBlock = document.createElement('pre');
-        outBlock.className = 'output-block';
-        outBlock.textContent = output;
-        wrapper.appendChild(outBlock);
-        currentAssistantBubble = null;
-      }
+          document.querySelectorAll('.loading').forEach(l => l.remove());
+          const wrapper = appendMessage('assistant', 'Command output:');
+          const outBlock = document.createElement('pre');
+          outBlock.className = 'output-block';
+          outBlock.textContent = output;
+          wrapper.appendChild(outBlock);
+          currentAssistantBubble = null;
+        }
       });
     </script>
   </body>
   </html>
   `;
 }
-
-
-export function deactivate() {}
