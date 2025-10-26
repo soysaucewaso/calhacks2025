@@ -2,10 +2,8 @@ import * as vscode from 'vscode';
 import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { tool, ModelMessage, streamText, stepCountIs } from "ai";
 import { z } from 'zod';
-import deepinfra_key from './keys';
-import { executeKaliCommand } from './kali'; // use ES import
-
-// Initialize DeepInfra client
+import { CodeRabbitAnalyzer } from './coderabbit';
+const { executeKaliCommand } = require('./kali');
 const deepinfra = createDeepInfra({
   apiKey: deepinfra_key(),
 });
@@ -229,7 +227,107 @@ export function activate(context: vscode.ExtensionContext) {
     });
   });
 
-  context.subscriptions.push(disposable);
+  const analyzePRDisposable = vscode.commands.registerCommand('ai-pentester.analyzePR', async () => {
+    // Get CodeRabbit API key from VS Code configuration, environment, or default
+    const config = vscode.workspace.getConfiguration('ai-pentester');
+    const codeRabbitApiKey = config.get<string>('codeRabbitApiKey') 
+      || process.env.CODERABBIT_API_KEY 
+      || 'cr-44fa3c9f29f9fe26429fc21d99d3a26ff47e52550de7fdc477ae501436';
+    
+    // Prompt user for repository information
+    const owner = await vscode.window.showInputBox({
+      prompt: 'Enter GitHub owner/username',
+      placeHolder: 'e.g., microsoft',
+    });
+
+    if (!owner) {
+      vscode.window.showInformationMessage('Repository owner is required');
+      return;
+    }
+
+    const repo = await vscode.window.showInputBox({
+      prompt: 'Enter repository name',
+      placeHolder: 'e.g., vscode',
+    });
+
+    if (!repo) {
+      vscode.window.showInformationMessage('Repository name is required');
+      return;
+    }
+
+    const prNumberInput = await vscode.window.showInputBox({
+      prompt: 'Enter pull request number',
+      placeHolder: 'e.g., 123',
+    });
+
+    if (!prNumberInput) {
+      vscode.window.showInformationMessage('Pull request number is required');
+      return;
+    }
+
+    const prNumber = parseInt(prNumberInput, 10);
+    if (isNaN(prNumber)) {
+      vscode.window.showErrorMessage('Invalid pull request number');
+      return;
+    }
+
+    // Show progress indicator
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Analyzing Pull Request',
+        cancellable: false,
+      },
+      async (progress) => {
+        try {
+          progress.report({ increment: 0, message: 'Initializing CodeRabbit analyzer...' });
+
+          // Initialize analyzer
+          const analyzer = new CodeRabbitAnalyzer(codeRabbitApiKey);
+
+          progress.report({ increment: 30, message: 'Fetching pull request details...' });
+
+          // Analyze the pull request
+          const issues = await analyzer.analyzePullRequest(owner, repo, prNumber);
+
+          progress.report({ increment: 60, message: 'Generating security report...' });
+
+          // Generate report
+          const report = await analyzer.generateReport(issues);
+
+          progress.report({ increment: 100, message: 'Complete!' });
+
+          // Show the report in a new document
+          const doc = await vscode.workspace.openTextDocument({
+            content: report,
+            language: 'markdown',
+          });
+          await vscode.window.showTextDocument(doc);
+
+          // Show summary notification
+          const criticalCount = issues.filter((i) => i.severity === 'critical').length;
+          const highCount = issues.filter((i) => i.severity === 'high').length;
+
+          if (criticalCount > 0 || highCount > 0) {
+            vscode.window.showWarningMessage(
+              `Security audit complete: ${issues.length} issue(s) found (${criticalCount} critical, ${highCount} high)`
+            );
+          } else if (issues.length > 0) {
+            vscode.window.showInformationMessage(
+              `Security audit complete: ${issues.length} issue(s) found (all low/medium severity)`
+            );
+          } else {
+            vscode.window.showInformationMessage('Security audit complete: No security issues found!');
+          }
+        } catch (error) {
+          vscode.window.showErrorMessage(`Error analyzing pull request: ${error}`);
+          console.error(error);
+        }
+      }
+    );
+  });
+
+  context.subscriptions.push(disposable, analyzePRDisposable);
 }
 
 export function deactivate() {}

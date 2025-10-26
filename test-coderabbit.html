@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeRabbit Security Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+
+        .stat-critical {
+            background: rgba(248, 81, 73, 0.1);
+            border-color: #f85149;
+        }
+
+        .stat-high {
+            background: rgba(255, 157, 0, 0.1);
+            border-color: #ff9d00;
+        }
+
+        .stat-medium {
+            background: rgba(255, 212, 0, 0.1);
+            border-color: #ffd400;
+        }
+
+        .stat-low {
+            background: rgba(56, 211, 85, 0.1);
+            border-color: #38d355;
+        }
+
+        .issues-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .issue-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid;
+        }
+
+        .issue-critical {
+            border-left-color: #f85149;
+        }
+
+        .issue-high {
+            border-left-color: #ff9d00;
+        }
+
+        .issue-medium {
+            border-left-color: #ffd400;
+        }
+
+        .issue-low {
+            border-left-color: #38d355;
+        }
+
+        .issue-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .severity-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-critical {
+            background: #f85149;
+            color: white;
+        }
+
+        .badge-high {
+            background: #ff9d00;
+            color: white;
+        }
+
+        .badge-medium {
+            background: #ffd400;
+            color: black;
+        }
+
+        .badge-low {
+            background: #38d355;
+            color: black;
+        }
+
+        .location {
+            color: #8b949e;
+            font-size: 14px;
+        }
+
+        .description {
+            margin: 10px 0;
+            line-height: 1.5;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+
+        .suggestion {
+            background: rgba(56, 211, 85, 0.1);
+            border-left: 3px solid #38d355;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+
+        .suggestion-title {
+            color: #38d355;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .category-tag {
+            display: inline-block;
+            background: #21262d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 5px 5px 0 0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .btn {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: #2ea043;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #8b949e;
+        }
+
+        .input-group input {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 10px;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .error {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid #f85149;
+            color: #f85149;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 CodeRabbit Security Analysis</h1>
+
+        <div class="summary-card">
+            <h2>Connect to Repository</h2>
+            <div class="input-group">
+                <label for="repoUrl">Repository URL</label>
+                <input type="text" id="repoUrl" placeholder="https://github.com/microsoft/vscode">
+            </div>
+            <div class="input-group">
+                <label for="prNumber">Pull Request Number</label>
+                <input type="number" id="prNumber" placeholder="123">
+            </div>
+            <button class="btn" onclick="analyzePR()">Analyze Security</button>
+        </div>
+
+        <div id="results" style="display: none;">
+            <div class="summary-card" id="summary"></div>
+            <div id="issues-container"></div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <p>🔍 Analyzing pull request...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        function analyzePR() {
+            const repoUrl = document.getElementById('repoUrl').value;
+            const prNumber = document.getElementById('prNumber').value;
+
+            if (!repoUrl || !prNumber) {
+                alert('Please enter repository URL and PR number');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+
+            // Call backend API
+            fetch('http://localhost:3000/api/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ repo_url: repoUrl, pr_number: parseInt(prNumber) })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                if (data.error) {
+                    displayError(data.error);
+                } else {
+                    displayResults(data);
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                displayError('Failed to analyze: ' + error.message);
+            });
+        }
+
+        function displayError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = '❌ ' + message;
+            errorDiv.style.display = 'block';
+        }
+
+        function displayResults(data) {
+            document.getElementById('results').style.display = 'block';
+            
+            const issues = data.issues || [];
+            
+            // Display summary
+            const summary = document.getElementById('summary');
+            const uniqueFiles = new Set(issues.map(i => i.file)).size;
+            
+            let summaryHTML = `<h2>Summary</h2>`;
+            summaryHTML += `<p><strong>${issues.length} issues across ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}</strong></p>`;
+            
+            // Count by severity
+            const bySeverity = {
+                critical: issues.filter(i => i.severity === 'critical'),
+                high: issues.filter(i => i.severity === 'high'),
+                medium: issues.filter(i => i.severity === 'medium'),
+                low: issues.filter(i => i.severity === 'low'),
+            };
+
+            summaryHTML += `<div class="summary-stats">`;
+            if (bySeverity.critical.length > 0) {
+                const categories = getTopCategories(bySeverity.critical);
+                summaryHTML += `<div class="stat-item stat-critical">
+                    ${bySeverity.critical.length} Critical${categories ? ' (' + categories + ')' : ''}
+                </div>`;
+            }
+            if (bySeverity.high.length > 0) {
+                const categories = getTopCategories(bySeverity.high);
+                summaryHTML += `<div class="stat-item stat-high">
+                    ${bySeverity.high.length} High${categories ? ' (' + categories + ')' : ''}
+                </div>`;
+            }
+            if (bySeverity.medium.length > 0) {
+                const categories = getTopCategories(bySeverity.medium);
+                summaryHTML += `<div class="stat-item stat-medium">
+                    ${bySeverity.medium.length} Medium${categories ? ' (' + categories + ')' : ''}
+                </div>`;
+            }
+            if (bySeverity.low.length > 0) {
+                summaryHTML += `<div class="stat-item stat-low">
+                    ${bySeverity.low.length} Low
+                </div>`;
+            }
+            summaryHTML += `</div>`;
+            
+            summary.innerHTML = summaryHTML;
+
+            // Display issues
+            const container = document.getElementById('issues-container');
+            container.innerHTML = '<h3 style="margin-bottom: 15px;">Detailed Issues</h3>';
+
+            issues.forEach((issue, index) => {
+                const issueHTML = `
+                    <div class="issue-card issue-${issue.severity}">
+                        <div class="issue-header">
+                            <span class="severity-badge badge-${issue.severity}">${issue.severity.toUpperCase()}</span>
+                            <span>${issue.title}</span>
+                        </div>
+                        <div class="location">📍 ${issue.file}:${issue.line}</div>
+                        <div class="category-tag">${issue.category}</div>
+                        <div class="description">${issue.description}</div>
+                        ${issue.code ? `<div class="code-block">${escapeHtml(issue.code)}</div>` : ''}
+                        ${issue.suggestion ? `<div class="suggestion">
+                            <div class="suggestion-title">💡 Fix Suggestion</div>
+                            ${issue.suggestion}
+                        </div>` : ''}
+                    </div>
+                `;
+                container.innerHTML += issueHTML;
+            });
+        }
+
+        function getTopCategories(issues) {
+            const categoryCount = {};
+            issues.forEach(issue => {
+                categoryCount[issue.category] = (categoryCount[issue.category] || 0) + 1;
+            });
+            return Object.entries(categoryCount)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2)
+                .map(([cat]) => cat)
+                .join(', ');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
+
