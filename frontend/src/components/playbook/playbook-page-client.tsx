@@ -89,6 +89,72 @@ export function PlaybookPageClient() {
     });
   };
 
+  const handleGenerateReport = async () => {
+    const formValues = form.getValues();
+    const target = formValues.target;
+    const benchmark = formValues.benchmark;
+
+    if (!target || !benchmark) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select both target and benchmark before generating report.",
+      });
+      return;
+    }
+
+    try {
+      // Connect to WebSocket server
+      const ws = new WebSocket('ws://localhost:8081');
+      
+      ws.onopen = () => {
+        console.log('WebSocket connection opened');
+        
+        // Send generateReport action
+        const message = {
+          action: 'generateReport',
+          benchmark: benchmark,
+          target: target
+        };
+        
+        ws.send(JSON.stringify(message));
+        
+        toast({
+          title: "Report Generation Started",
+          description: `Generating report for ${target} using ${benchmark} benchmark...`,
+        });
+      };
+      
+      ws.onmessage = (event) => {
+        const response = JSON.parse(event.data);
+        console.log('WebSocket response:', response);
+        
+        toast({
+          title: "Report Generated",
+          description: "Report generation completed successfully.",
+        });
+        
+        ws.close();
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        toast({
+          variant: "destructive",
+          title: "Connection Error",
+          description: "Could not connect to the WebSocket server at ws://localhost:8081",
+        });
+      };
+    } catch (error) {
+      console.error('Error connecting to WebSocket:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to generate report. Please try again.",
+      });
+    }
+  };
+
   const handleExecute = () => {
     toast({
       title: "Execution Started",
@@ -200,7 +266,7 @@ export function PlaybookPageClient() {
                 />
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex gap-2">
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -208,6 +274,10 @@ export function PlaybookPageClient() {
                   <Bot className="mr-2 h-4 w-4" />
                 )}
                 Suggest Tests
+              </Button>
+              <Button type="button" onClick={handleGenerateReport} variant="secondary" disabled={isLoading}>
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Generate Report
               </Button>
             </CardFooter>
           </form>
