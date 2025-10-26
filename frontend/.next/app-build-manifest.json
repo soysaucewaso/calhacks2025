@@ -16,25 +16,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/training/page.js"
     ],
-    "/ai-pentester/page": [
+    "/reports/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/ai-pentester/page.js"
+      "static/chunks/app/reports/page.js"
     ],
     "/playbook/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/playbook/page.js"
     ],
-    "/reports/page": [
+    "/ai-pentester/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/reports/page.js"
-    ],
-    "/settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/settings/page.js"
+      "static/chunks/app/ai-pentester/page.js"
     ]
   }
 }
