@@ -1,10 +1,22 @@
 # ai-pentester README
 
-This is the README for your extension "ai-pentester". After writing up a brief description, we recommend including the following sections.
+AI-powered pentesting and code security analysis VS Code extension for comprehensive cybersecurity auditing.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### 1. AI Pentesting Assistant
+Convert natural language requests into security testing commands. Helps formulate attack plans and run commands on Kali Linux VM for penetration testing.
+
+### 2. **NEW: Pull Request Security Analysis**
+Integrated CodeRabbit AI to automatically analyze GitHub pull requests for security vulnerabilities including:
+- Hardcoded passwords and API keys
+- SQL injection risks  
+- Code injection vulnerabilities (eval)
+- XSS vulnerabilities
+- Best practice violations
+- Security anti-patterns
+
+The analyzer provides comprehensive security reports with severity classification (Critical, High, Medium, Low, Info) and actionable recommendations.
 
 For example if there is an image subfolder under your extension project workspace:
 
@@ -14,7 +26,54 @@ For example if there is an image subfolder under your extension project workspac
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- Node.js 18+
+- VS Code 1.105.0 or higher
+- CodeRabbit API Key (for PR analysis feature)
+
+## Installation
+
+1. Clone this repository
+2. Run `npm install` to install dependencies
+3. Press F5 in VS Code to launch extension development host
+4. Or package the extension: `vsce package`
+
+## Configuration
+
+### CodeRabbit API Key
+
+The extension requires a CodeRabbit API key for security analysis. You can configure it in three ways:
+
+1. **VS Code Settings** (Recommended for persistent configuration):
+   - Open VS Code settings (Cmd/Ctrl + ,)
+   - Search for "AI Pentester"
+   - Enter your CodeRabbit API key
+
+2. **Environment Variable**:
+   - Add `CODERABBIT_API_KEY=your_api_key` to your system environment variables or `.env` file
+
+3. **Default**: The extension includes a default API key for demo purposes (already configured)
+
+## Usage
+
+### AI Pentester
+1. Press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux)
+2. Search for "AI Pentester: Open Terminal Interactor"
+3. Ask the AI assistant to perform penetration testing tasks
+4. Confirm commands before execution
+
+### Pull Request Security Analysis
+1. Press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux)
+2. Search for "AI Pentester: Analyze Pull Request Security"
+3. Enter the GitHub repository owner
+4. Enter the repository name
+5. Enter the pull request number
+6. View the comprehensive security report
+
+The security report will highlight:
+- **Critical Issues**: Immediate security threats requiring urgent attention
+- **High Priority**: Serious security flaws that should be addressed
+- **Medium/Low**: Security concerns following best practices
+- **Info**: General recommendations and improvements
 
 ## Extension Settings
 

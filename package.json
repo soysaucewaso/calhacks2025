@@ -20,8 +20,23 @@
       {
         "command": "ai-pentester.activate",
         "title": "Open Terminal Interactor"
+      },
+      {
+        "command": "ai-pentester.analyzePR",
+        "title": "Analyze Pull Request Security",
+        "category": "AI Pentester"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "AI Pentester",
+      "properties": {
+        "ai-pentester.codeRabbitApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "CodeRabbit API key for security analysis"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -44,7 +59,9 @@
   },
   "dependencies": {
     "@ai-sdk/deepinfra": "^1.0.23",
+    "@octokit/rest": "^22.0.0",
     "ai": "^5.0.76",
+    "axios": "^1.12.2",
     "node-ssh": "^13.2.1"
   }
 }
