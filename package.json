@@ -9,7 +9,10 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:ai-pentester.activate",
+    "onCommand:ai-pentester.coderabbitReport"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -20,6 +23,10 @@
       {
         "command": "ai-pentester.activate",
         "title": "Open Terminal Interactor"
+      },
+      {
+        "command": "ai-pentester.coderabbitReport",
+        "title": "CodeRabbit: Generate Report"
       }
     ]
   },
@@ -45,6 +52,7 @@
   "dependencies": {
     "@ai-sdk/deepinfra": "^1.0.23",
     "ai": "^5.0.76",
-    "node-ssh": "^13.2.1"
+    "node-ssh": "^13.2.1",
+    "dotenv": "^16.4.5"
   }
 }

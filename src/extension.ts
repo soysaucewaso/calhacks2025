@@ -1,8 +1,10 @@
+import 'dotenv/config';
 import * as vscode from 'vscode';
 
 import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { tool, ToolSet, ModelMessage, streamText, zodSchema, stepCountIs } from "ai";
 import { z } from 'zod';
+import { generateReport } from './coderabbit';
 const { executeKaliCommand } = require('./kali');
 const deepinfra = createDeepInfra({
   apiKey: process.env.DEEPINFRA_API_KEY,
@@ -69,6 +71,30 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   context.subscriptions.push(disposable);
+
+  const disposableReport = vscode.commands.registerCommand('ai-pentester.coderabbitReport', async () => {
+    const today = new Date();
+    const defaultTo = today.toISOString().slice(0, 10);
+    const fromDate = new Date(today);
+    fromDate.setDate(fromDate.getDate() - 7);
+    const defaultFrom = fromDate.toISOString().slice(0, 10);
+
+    const from = await vscode.window.showInputBox({ prompt: 'Start date (YYYY-MM-DD)', value: defaultFrom });
+    if (!from) { return; }
+    const to = await vscode.window.showInputBox({ prompt: 'End date (YYYY-MM-DD)', value: defaultTo });
+    if (!to) { return; }
+    const customPrompt = await vscode.window.showInputBox({ prompt: 'Optional custom prompt for the report (press Enter to skip)', value: '' });
+
+    try {
+      const md = await generateReport({ from, to, prompt: customPrompt || undefined });
+      const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: md });
+      await vscode.window.showTextDocument(doc, { preview: false });
+    } catch (err: any) {
+      vscode.window.showErrorMessage(String(err?.message || err));
+    }
+  });
+
+  context.subscriptions.push(disposableReport);
 }
 
 let terminal: vscode.Terminal | undefined;
